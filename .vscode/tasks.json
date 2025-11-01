@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install deps (Poetry)",
+      "type": "shell",
+      "command": "poetry install",
+      "problemMatcher": [],
+      "group": "none"
+    },
+    {
+      "label": "Start server (make run)",
+      "type": "shell",
+      "command": "make run",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Start server (0.0.0.0)",
+      "type": "shell",
+      "command": "make run0",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Format (black+isort)",
+      "type": "shell",
+      "command": "make fmt",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Lint (ruff)",
+      "type": "shell",
+      "command": "make lint",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Tests (pytest)",
+      "type": "shell",
+      "command": "make test",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Export requirements.txt",
+      "type": "shell",
+      "command": "make export-reqs",
+      "problemMatcher": [],
+      "group": "none"
+    }
+  ]
+}

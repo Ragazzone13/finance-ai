@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "finance-ai"
+version = "0.1.0"
+description = "AI-powered personal finance app (FastAPI + SQLModel)"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "finance_ai" }]
+
+[tool.poetry.dependencies]
+# Pick your Python line—use only ONE of these:
+# python = ">=3.11,<3.13"
+python = ">=3.12,<3.13"
+
+fastapi = "0.115.0"
+uvicorn = { extras = ["standard"], version = "0.30.0" }
+python-dotenv = "1.0.1"
+pydantic = "2.7.1"
+pydantic-settings = "2.2.1"
+sqlmodel = "0.0.22"
+sqlalchemy = "2.0.29"
+alembic = "1.13.2"
+psycopg2-binary = "2.9.9"
+pandas = "2.2.2"
+python-multipart = "0.0.9"
+httpx = "0.27.2"
+apscheduler = "3.10.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "8.2.0"
+black = "24.4.2"
+ruff = "0.4.5"
+isort = "5.13.2"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
