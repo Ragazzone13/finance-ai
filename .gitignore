@@ -50,7 +50,6 @@ coverage.xml
 
 # PyCharm / VS Code
 .idea/
-.vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
 !.vscode/launch.json
