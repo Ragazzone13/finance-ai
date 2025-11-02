@@ -1,18 +1,16 @@
-from sqlmodel import create_engine, Session
-from finance_ai.core.config import settings
-from finance_ai.db.base import metadata
+from __future__ import annotations
 
-# For SQLite, check_same_thread=False is often used with async frameworks,
-# but here we use standard sync Session so default is fine.
+from sqlmodel import SQLModel, create_engine, Session
+from finance_ai.core.config import settings
+
+# For SQLite dev: create tables automatically. For Postgres in prod: use Alembic.
 engine = create_engine(settings.DATABASE_URL, echo=False)
 
-def init_db():
-    """
-    For SQLite dev: create tables automatically.
-    For Postgres in prod: use Alembic migrations instead of create_all.
-    """
+
+def init_db() -> None:
     if settings.DATABASE_URL.startswith("sqlite"):
-        metadata.create_all(engine)
+        SQLModel.metadata.create_all(engine)
+
 
 def get_session():
     with Session(engine) as session:
