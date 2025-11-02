@@ -1,18 +1,16 @@
 # finance_ai/routers/aggregations.py
 from __future__ import annotations
 
-import datetime as dt
 from decimal import Decimal
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, select, text
 
-from finance_ai.db.models import Transaction, Category, User
+from finance_ai.db.models import Account, Transaction, User
 from finance_ai.db.session import get_session
-from finance_ai.deps.users import get_current_user
+from finance_ai.routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/aggregations", tags=["aggregations"])
 
@@ -24,81 +22,64 @@ class CategoryMonthlyTotal(BaseModel):
 
 
 class MonthSummary(BaseModel):
-    month: str  # "YYYY-MM"
+    month: str
     user_id: int
-    account_id: Optional[int]
+    account_id: Optional[int] = None
     debit_total: Decimal
     credit_total: Decimal
     net_total: Decimal
     by_category: List[CategoryMonthlyTotal]
 
 
-def _month_bounds(month: str) -> Tuple[dt.date, dt.date]:
-    try:
-        year, mon = month.split("-")
-        y = int(year)
-        m = int(mon)
-        start = dt.date(y, m, 1)
-        if m == 12:
-            end = dt.date(y + 1, 1, 1) - dt.timedelta(days=1)
-        else:
-            end = dt.date(y, m + 1, 1) - dt.timedelta(days=1)
-        return start, end
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid month format: {month}. Use YYYY-MM") from e
+def _ensure_account_owned(session: Session, user_id: int, account_id: int) -> Account:
+    acct = session.get(Account, account_id)
+    if not acct or acct.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return acct
 
 
 @router.get("/monthly", response_model=MonthSummary)
-def monthly_summary(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+def monthly(
     month: str = Query(..., description="Format YYYY-MM"),
     account_id: Optional[int] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
-    start_date, end_date = _month_bounds(month)
+    # Verify account ownership if filtering by account
+    if account_id:
+        _ensure_account_owned(session, current_user.id, account_id)
 
-    # Debit total
-    debit_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-        Transaction.user_id == current_user.id,
-        Transaction.txn_type == "debit",
-        Transaction.date >= start_date,
-        Transaction.date <= end_date,
+    # Aggregate totals
+    month_like = f"{month}-%"
+    base = select(Transaction).join(Account).where(
+        Account.user_id == current_user.id,
+        Transaction.occurred_on.like(month_like),
     )
-    if account_id is not None:
-        debit_stmt = debit_stmt.where(Transaction.account_id == account_id)
-    debit_total: Decimal = session.exec(debit_stmt).one()[0]  # type: ignore
+    if account_id:
+        base = base.where(Transaction.account_id == account_id)
 
-    # Credit total
-    credit_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-        Transaction.user_id == current_user.id,
-        Transaction.txn_type == "credit",
-        Transaction.date >= start_date,
-        Transaction.date <= end_date,
+    # Totals by type
+    debit_total = Decimal(
+        session.exec(
+            select(text("COALESCE(SUM(amount), 0)")).select_from(base.subquery()).where(text("type = 'debit'"))
+        ).first() or 0
     )
-    if account_id is not None:
-        credit_stmt = credit_stmt.where(Transaction.account_id == account_id)
-    credit_total: Decimal = session.exec(credit_stmt).one()[0]  # type: ignore
+    credit_total = Decimal(
+        session.exec(
+            select(text("COALESCE(SUM(amount), 0)")).select_from(base.subquery()).where(text("type = 'credit'"))
+        ).first() or 0
+    )
 
-    # By category
-    cat_stmt = (
+    # Group by category
+    rows = session.exec(
         select(
             Transaction.category_id,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
-            Category.name,
+            text("COALESCE(SUM(amount), 0) AS total"),
+            text("NULL AS category_name"),  # fill if you have a categories table joined
         )
-        .join(Category, Category.id == Transaction.category_id, isouter=True)
-        .where(
-            Transaction.user_id == current_user.id,
-            Transaction.date >= start_date,
-            Transaction.date <= end_date,
-        )
-        .group_by(Transaction.category_id, Category.name)
-        .order_by(func.coalesce(func.sum(Transaction.amount), 0).desc())
-    )
-    if account_id is not None:
-        cat_stmt = cat_stmt.where(Transaction.account_id == account_id)
-
-    rows = session.exec(cat_stmt).all()
+        .select_from(base.subquery())
+        .group_by(Transaction.category_id)
+    ).all()
 
     by_category: List[CategoryMonthlyTotal] = []
     for category_id, total, category_name in rows:
@@ -110,13 +91,13 @@ def monthly_summary(
             )
         )
 
-    net_total = (credit_total or Decimal(0)) - (debit_total or Decimal(0))
+    net_total = credit_total - debit_total
     return MonthSummary(
         month=month,
         user_id=current_user.id,
         account_id=account_id,
-        debit_total=Decimal(debit_total),
-        credit_total=Decimal(credit_total),
-        net_total=Decimal(net_total),
+        debit_total=debit_total,
+        credit_total=credit_total,
+        net_total=net_total,
         by_category=by_category,
     )
