@@ -1,14 +1,20 @@
+# finance_ai/db/models.py
 from __future__ import annotations
 
-from datetime import date, datetime
+import datetime as dt
+from decimal import Decimal
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
 
+def _utcnow() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc)
+
+
 class Timestamped(SQLModel):
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    created_at: dt.datetime = Field(default_factory=_utcnow, nullable=False)
+    updated_at: dt.datetime = Field(default_factory=_utcnow, nullable=False)
 
 
 class User(Timestamped, table=True):
@@ -35,8 +41,8 @@ class Transaction(Timestamped, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
     account_id: Optional[int] = Field(default=None, index=True)
-    date: date = Field(index=True)
-    amount: float
+    date: dt.date = Field(index=True)
+    amount: Decimal
     txn_type: str = Field(index=True)  # debit | credit
     category_id: Optional[int] = Field(default=None, index=True)
     vendor: Optional[str] = Field(default=None, index=True)
@@ -51,15 +57,15 @@ class Budget(Timestamped, table=True):
     user_id: int = Field(index=True)
     month: str = Field(index=True)  # "YYYY-MM"
     category_id: int = Field(index=True)
-    amount: float
+    amount: Decimal
 
 
 class Goal(Timestamped, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
     name: str
-    target_amount: float
-    target_date: Optional[date] = None
+    target_amount: Decimal
+    target_date: Optional[dt.date] = None
 
 
 class Insight(Timestamped, table=True):
