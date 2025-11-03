@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -15,56 +15,26 @@ from finance_ai.routers.auth import get_current_user
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
-class AccountCreate(BaseModel):
-    name: str
-    institution: Optional[str] = None
-    starting_balance: Decimal = Decimal("0.00")
-
-
-class AccountRead(BaseModel):
+class AccountReadResponse(BaseModel):
     id: int
     name: str
-    institution: Optional[str] = None
     balance: Decimal
 
     @staticmethod
-    def from_model(a: Account) -> "AccountRead":
-        return AccountRead(
-            id=a.id,
-            name=a.name,
-            institution=a.institution,
-            balance=a.balance,
-        )
+    def from_model(a: Account) -> "AccountReadResponse":
+        return AccountReadResponse(id=a.id, name=a.name, balance=a.balance)
 
 
-@router.get("", response_model=List[AccountRead])
+@router.get("", response_model=List[AccountReadResponse])
 def list_accounts(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
     rows = session.exec(select(Account).where(Account.user_id == current_user.id)).all()
-    return [AccountRead.from_model(a) for a in rows]
+    return [AccountReadResponse.from_model(a) for a in rows]
 
 
-@router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
-def create_account(
-    payload: AccountCreate,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    acct = Account(
-        name=payload.name,
-        institution=payload.institution,
-        balance=payload.starting_balance,
-        user_id=current_user.id,
-    )
-    session.add(acct)
-    session.commit()
-    session.refresh(acct)
-    return AccountRead.from_model(acct)
-
-
-@router.get("/{account_id}", response_model=AccountRead)
+@router.get("/{account_id}", response_model=AccountReadResponse)
 def get_account(
     account_id: int,
     session: Session = Depends(get_session),
@@ -72,8 +42,8 @@ def get_account(
 ):
     acct = session.get(Account, account_id)
     if not acct or acct.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return AccountRead.from_model(acct)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    return AccountReadResponse.from_model(acct)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -84,6 +54,6 @@ def delete_account(
 ):
     acct = session.get(Account, account_id)
     if not acct or acct.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     session.delete(acct)
     session.commit()

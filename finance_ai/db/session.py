@@ -13,7 +13,7 @@ def get_database_url() -> str:
 
 engine = create_engine(
     get_database_url(),
-    echo=getattr(settings, "SQLALCHEMY_ECHO", False) is True,
+    echo=bool(getattr(settings, "SQLALCHEMY_ECHO", False)),
     future=True,
 )
 

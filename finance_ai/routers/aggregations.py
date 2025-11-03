@@ -45,12 +45,11 @@ def monthly(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    # Verify account ownership if filtering by account
     if account_id:
         _ensure_account_owned(session, current_user.id, account_id)
 
-    # Aggregate totals
     month_like = f"{month}-%"
+
     base = select(Transaction).join(Account).where(
         Account.user_id == current_user.id,
         Transaction.occurred_on.like(month_like),
@@ -61,21 +60,25 @@ def monthly(
     # Totals by type
     debit_total = Decimal(
         session.exec(
-            select(text("COALESCE(SUM(amount), 0)")).select_from(base.subquery()).where(text("type = 'debit'"))
+            select(text("COALESCE(SUM(amount), 0)"))
+            .select_from(base.subquery())
+            .where(text("type = 'debit'"))
         ).first() or 0
     )
     credit_total = Decimal(
         session.exec(
-            select(text("COALESCE(SUM(amount), 0)")).select_from(base.subquery()).where(text("type = 'credit'"))
+            select(text("COALESCE(SUM(amount), 0)"))
+            .select_from(base.subquery())
+            .where(text("type = 'credit'"))
         ).first() or 0
     )
 
-    # Group by category
+    # Group by category (category_name placeholder unless you join categories)
     rows = session.exec(
         select(
             Transaction.category_id,
             text("COALESCE(SUM(amount), 0) AS total"),
-            text("NULL AS category_name"),  # fill if you have a categories table joined
+            text("NULL AS category_name"),
         )
         .select_from(base.subquery())
         .group_by(Transaction.category_id)

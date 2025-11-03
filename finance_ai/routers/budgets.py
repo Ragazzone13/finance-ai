@@ -51,7 +51,6 @@ def create_budget(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    # prevent duplicates for same user/category/month
     exists = session.exec(
         select(Budget).where(
             Budget.user_id == current_user.id,

@@ -4,9 +4,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 from typing import Optional
-
-from sqlmodel import Field, SQLModel
-
+from sqlmodel import SQLModel, Field
 
 def _utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
@@ -23,11 +21,11 @@ class User(Timestamped, table=True):
     password_hash: str
 
 
-class Account(Timestamped, table=True):
+class Account(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
-    name: str
-    acct_type: str = Field(default="checking", index=True)
+    name: str = Field(index=True)  # ensure index for autogen test
+    balance: Decimal = Field(default=Decimal("0.00"))
 
 
 class Category(Timestamped, table=True):
@@ -63,7 +61,7 @@ class Budget(Timestamped, table=True):
 class Goal(Timestamped, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
-    name: str
+    name: str = Field(index=True)
     target_amount: Decimal
     target_date: Optional[dt.date] = None
 

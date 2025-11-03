@@ -1,7 +1,11 @@
 # finance_ai/routers/auth.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+import time
+from collections import defaultdict, deque
+from typing import Deque, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Security, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
@@ -31,6 +35,24 @@ class MeResponse(BaseModel):
     email: EmailStr
 
 
+_ATTEMPTS: Dict[str, Deque[float]] = defaultdict(deque)
+MAX_ATTEMPTS = 5
+WINDOW_SEC = 60
+
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    q = _ATTEMPTS[ip]
+    while q and now - q[0] > WINDOW_SEC:
+        q.popleft()
+    if len(q) >= MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again shortly.",
+        )
+    q.append(now)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=201)
 def register(payload: RegisterRequest, session: Session = Depends(get_session)):
     existing = session.exec(select(User).where(User.email == payload.email)).first()
@@ -47,7 +69,14 @@ def register(payload: RegisterRequest, session: Session = Depends(get_session)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session),
+):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
     user = session.exec(select(User).where(User.email == form.username)).first()
     if not user or not verify_password(form.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")

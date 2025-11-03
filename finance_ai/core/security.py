@@ -9,12 +9,10 @@ from passlib.context import CryptContext
 
 from finance_ai.core.settings import settings
 
-# Use Argon2 for password hashing (robust & modern)
-# Params are sensible defaults; you can tune memory_cost/time_cost if needed.
 pwd_context = CryptContext(
     schemes=["argon2"],
     deprecated="auto",
-    argon2__memory_cost=102400,  # ~100 MiB
+    argon2__memory_cost=102400,
     argon2__time_cost=2,
     argon2__parallelism=8,
 )
@@ -29,9 +27,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def _jwt_secret() -> str:
-    """
-    Resolve the JWT secret key. Prefer JWT_SECRET_KEY if set; otherwise fallback to SECRET_KEY.
-    """
     return settings.JWT_SECRET_KEY or settings.SECRET_KEY  # type: ignore[attr-defined]
 
 
